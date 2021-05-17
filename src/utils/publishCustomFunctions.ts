@@ -7,6 +7,7 @@ import fs from 'fs-extra';
 import ora from 'ora';
 import os from 'os';
 import path from 'path';
+import prompts from 'prompts';
 import vm from 'vm';
 
 /* internal dependencies */
@@ -35,18 +36,51 @@ type Action = {
 type Actions = Action[];
 
 const groomMetaData = async (): Promise<MetaData> => {
-  console.log('Grooming functions.json ...');
+  const spinner = ora('Grooming functions.json ...').start();
 
+  const metaData = await fetchFunctions()
+    .then(customFunctions => {
+      spinner.succeed();
+
+      return updateFunctionsJson(customFunctions);
+    })
+    .catch(async error => {
+      spinner.fail();
+
+      const { upToDate } = await prompts({
+        type: 'toggle',
+        name: 'upToDate',
+        message: `Failed to detect context calls from functions. Is your functions.json up-to-date?`,
+        initial: false,
+        active: 'yes',
+        inactive: 'no (abort)',
+      });
+
+      if (upToDate) {
+        return {} as MetaData;
+      } else {
+        process.exit();
+      }
+    });
+
+  return metaData;
+};
+
+const fetchFunctions = async (): Promise<NamedObject> => {
   const buildDir = path.join(os.tmpdir(), identifier);
   const customJsFile = path.join(buildDir, 'dist', 'custom.js');
-
   const customJs = fs.readFileSync(customJsFile, 'utf8');
+
   const script = new vm.Script(`${customJs}; fn = custom;`);
 
   const ctx = { fn: {} };
   script.runInNewContext(ctx);
-  const customFunctions = ctx.fn as NamedObject;
+  return ctx.fn as NamedObject;
+};
 
+const updateFunctionsJson = async (
+  customFunctions: NamedObject,
+): Promise<MetaData> => {
   const functionsJsonFile = path.join(workingDir, 'functions.json');
   const metaData = fs.readJsonSync(functionsJsonFile);
 
