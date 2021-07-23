@@ -1,11 +1,12 @@
 import test, { ExecutionContext } from 'ava';
-import { validateFunction } from '../../src/utils/validateFunction';
-import { ValidationError, Validator } from 'jsonschema';
+import { validateFunction, functionValidator } from '../../src/utils/validateFunction';
+import { Validator } from 'jsonschema';
+import fetchMock from 'fetch-mock';
 
 type Context = ExecutionContext<unknown>;
 
 const schema = {
-  "$id": "/schema/actions/function.json",
+  "$id": "/schemas/actions/function.json",
   "title": "Function",
   "properties": {
     "name": {
@@ -50,4 +51,18 @@ test('invalidate schemas that do not have valid values for properties', async (t
 
   t.is(status, 'error');
   t.is(message, 'is not one of enum values: CreateIcon,DeleteIcon');
+});
+
+test('populating the validator with the schema', async (t: Context): Promise<void> => {
+  fetchMock.mock('http://example.com/schemas/action/function.json', {
+    body: JSON.stringify(schema)
+  });
+
+  const config = {
+    schemaUrl: 'http://example.com',
+    functionSchemaPath: '/schemas/action/function.json'
+  }
+  const {schemas} = await functionValidator(config);
+
+  t.is(schemas['http://example.com/schemas/actions/function.json'].title, 'Function');
 });

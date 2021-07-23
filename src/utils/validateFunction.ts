@@ -1,6 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
-import fetch from 'node-fetch';
+// import fetch from 'node-fetch';
 import { Validator, ValidatorResult, ValidationError } from 'jsonschema';
 
 type FunctionDefinition = {
